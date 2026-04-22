@@ -5,91 +5,48 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 24px; }
     h1 { color: #2f5bea; }
-
-    .cards {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .card {
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 12px;
-      min-width: 150px;
-      background: #fafafa;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 32px;
-    }
-
-    th, td {
-      border: 1px solid #ddd;
-      padding: 8px;
-      text-align: left;
-    }
-
-    th {
-      background: #f0f0f0;
-    }
+    .cards { display: flex; gap: 16px; margin-bottom: 24px; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 12px; min-width: 150px; background: #fafafa; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 28px; }
+    th, td { border: 1px solid #ddd; padding: 8px; }
+    th { background: #f0f0f0; }
   </style>
 </head>
 
 <body>
 
-<h1>EAST ServiceNow Operations Dashboard</h1>
+<h1>ServiceNow Operations Dashboard</h1>
 
-<!-- SUMMARY -->
 <div class="cards">
   <div class="card"><b>Incoming</b><br><span id="incoming">0</span></div>
   <div class="card"><b>Closed</b><br><span id="closed">0</span></div>
   <div class="card"><b>Backlog</b><br><span id="backlog">0</span></div>
 </div>
 
-<!-- TEAM BACKLOG -->
 <h2>Team Backlog</h2>
 <table>
   <thead>
-    <tr>
-      <th>Team Member</th>
-      <th>Open</th>
-      <th>Closed</th>
-    </tr>
+    <tr><th>Name</th><th>Open</th><th>Closed</th></tr>
   </thead>
   <tbody id="teamTable"></tbody>
 </table>
 
-<!-- OPEN TICKETS -->
 <h2>Open Tickets</h2>
 <table>
   <thead>
-    <tr>
-      <th>Ticket</th>
-      <th>Assignment Group</th>
-      <th>Assignee</th>
-      <th>Status</th>
-    </tr>
+    <tr><th>Ticket</th><th>Group</th><th>Assignee</th><th>Status</th></tr>
   </thead>
   <tbody id="openTickets"></tbody>
 </table>
 
 <script>
-/* ========= CONFIG ========= */
-
-// INC only for now (RITM comes later)
-const TICKET_PREFIX = "INC";
-
-// EAST assignment groups
+// ===== CONFIG =====
 const EAST_GROUPS = [
   "IT Supp: EAST - Delivery",
   "IT Supp: EAST - Leads",
   "IT Supp: System Access Requests"
 ];
 
-// EAST team (full display names)
 const TEAM = [
   "Chris Braga",
   "Christina Sunil",
@@ -101,19 +58,22 @@ const TEAM = [
   "Sreeja Janumpally"
 ];
 
-/* ========= LOAD DATA ========= */
-
+// ===== LOAD DATA =====
 fetch("data/incidents.json")
-  .then(res => res.json())
-  .then(data => {
-    const records = data.result || [];
+  .then(r => r.json())
+  .then(d => {
+    const all = d.result || [];
 
-    // Filter to EAST INC tickets
-    const eastTickets = records.filter(r => {
+    // ✅ SAFE group extraction (handles ALL ServiceNow shapes)
+    const getGroup = r =>
+      r.assignment_group?.display_value ||
+      r.assignment_group ||
+      "";
+
+    const eastTickets = all.filter(r => {
       const number = r.number || "";
-      const group = r.assignment_group?.display_value || "";
-      return number.startsWith(TICKET_PREFIX) &&
-             EAST_GROUPS.includes(group);
+      const group = getGroup(r);
+      return number.startsWith("INC") && EAST_GROUPS.includes(group);
     });
 
     const isClosed = r =>
@@ -122,49 +82,33 @@ fetch("data/incidents.json")
     const open = eastTickets.filter(r => !isClosed(r));
     const closed = eastTickets.filter(r => isClosed(r));
 
-    // SUMMARY
-    document.getElementById("incoming").innerText = eastTickets.length;
-    document.getElementById("closed").innerText = closed.length;
-    document.getElementById("backlog").innerText = open.length;
+    // ===== SUMMARY =====
+    incoming.innerText = eastTickets.length;
+    closedEl.innerText = closed.length;
+    backlog.innerText = open.length;
 
-    // TEAM BACKLOG TABLE
-    const teamTable = document.getElementById("teamTable");
+    closedEl = document.getElementById("closed");
 
+    // ===== TEAM TABLE =====
     TEAM.forEach(name => {
-      const mineOpen = open.filter(r =>
-        r.assigned_to?.display_value === name
-      );
-      const mineClosed = closed.filter(r =>
-        r.assigned_to?.display_value === name
-      );
-
-      teamTable.innerHTML += `
-        <tr>
-          <td>${name}</td>
-          <td>${mineOpen.length}</td>
-          <td>${mineClosed.length}</td>
-        </tr>
-      `;
+      const openCount = open.filter(r => r.assigned_to?.display_value === name).length;
+      const closedCount = closed.filter(r => r.assigned_to?.display_value === name).length;
+      teamTable.innerHTML += `<tr><td>${name}</td><td>${openCount}</td><td>${closedCount}</td></tr>`;
     });
 
-    // OPEN TICKETS TABLE
-    const openTable = document.getElementById("openTickets");
-
+    // ===== OPEN TICKETS =====
     open.forEach(r => {
-      openTable.innerHTML += `
+      openTickets.innerHTML += `
         <tr>
           <td>${r.number}</td>
-          <td>${r.assignment_group?.display_value || "-"}</td>
+          <td>${getGroup(r)}</td>
           <td>${r.assigned_to?.display_value || "Unassigned"}</td>
           <td>${r.state?.display_value || "-"}</td>
-        </tr>
-      `;
+        </tr>`;
     });
-  })
-  .catch(err => {
-    console.error("Failed to load data:", err);
   });
 </script>
 
 </body>
 </html>
+``
