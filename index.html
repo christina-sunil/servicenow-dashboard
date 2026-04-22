@@ -1,12 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ServiceNow Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>ServiceNow Operations Dashboard</title>
+
   <style>
     body { font-family: Arial; margin: 24px; }
     h1 { color: #2f5bea; }
-    .cards { display: flex; gap: 16px; margin-bottom: 24px; }
+
+    .cards {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
     .card {
       border: 1px solid #ccc;
       padding: 14px;
@@ -14,31 +21,40 @@
       min-width: 150px;
       background: #f9f9f9;
     }
+
     table {
       border-collapse: collapse;
       width: 100%;
       margin-bottom: 24px;
     }
+
     th, td {
       border: 1px solid #ddd;
       padding: 8px;
+      text-align: left;
     }
-    th { background: #f0f0f0; }
+
+    th {
+      background: #f0f0f0;
+    }
   </style>
 </head>
 
 <body>
+
 <h1>ServiceNow Operations Dashboard</h1>
 
+<!-- ✅ Leadership Summary -->
 <div class="cards">
-  <div class="card"><b>Incoming</b><br><span id="incoming"></span></div>
-  <div class="card"><b>Closed</b><br><span id="closed"></span></div>
-  <div class="card"><b>Backlog</b><br><span id="backlog"></span></div>
-  <div class="card"><b>SLA %</b><br><span id="sla"></span></div>
-  <div class="card"><b>FTR %</b><br><span id="ftr"></span></div>
+  <div class="card"><b>Incoming</b><br><span id="incoming">0</span></div>
+  <div class="card"><b>Closed</b><br><span id="closed">0</span></div>
+  <div class="card"><b>Backlog</b><br><span id="backlog">0</span></div>
+  <div class="card"><b>SLA %</b><br><span id="sla">0%</span></div>
+  <div class="card"><b>FTR %</b><br><span id="ftr">0%</span></div>
 </div>
 
-<h2>Team‑wise View</h2>
+<!-- ✅ Team-wise View -->
+<h2>Team-wise View</h2>
 <table>
   <thead>
     <tr>
@@ -53,13 +69,15 @@
   <tbody id="teamTable"></tbody>
 </table>
 
+<!-- ✅ Aging Buckets -->
 <h2>Aging Buckets</h2>
 <ul>
-  <li>0–5 days: <span id="age0_5"></span></li>
-  <li>6–10 days: <span id="age6_10"></span></li>
-  <li>10+ days: <span id="age10p"></span></li>
+  <li>0–5 days: <span id="age0_5">0</span></li>
+  <li>6–10 days: <span id="age6_10">0</span></li>
+  <li>10+ days: <span id="age10p">0</span></li>
 </ul>
 
+<!-- ✅ Open Tickets -->
 <h2>Open Tickets</h2>
 <table>
   <thead>
@@ -74,78 +92,136 @@
 </table>
 
 <script>
+/* =========================
+   CONFIG
+========================= */
+
+// ✅ Only these ticket types
+const ALLOWED_PREFIXES = ["INC", "RITM"];
+
+// ✅ Only your team
+const TEAM = [
+  "Chris",
+  "Christina",
+  "Digvijay",
+  "Raleigh",
+  "Saranmai",
+  "Balaji",
+  "Mano",
+  "Sreeja"
+];
+
+/* =========================
+   DATA LOAD
+========================= */
+
 fetch('data/incidents.json')
   .then(r => r.json())
   .then(d => {
-    const data = d.result || [];
+
     const now = new Date();
+    const allData = d.result || [];
+
+    // ✅ FILTER: ticket type + team
+    const data = allData.filter(i => {
+      const number = i.number || "";
+      const assignee = i.assigned_to?.display_value || "";
+
+      const validType = ALLOWED_PREFIXES.some(p => number.startsWith(p));
+      const validTeam = TEAM.some(t => assignee.toLowerCase().includes(t.toLowerCase()));
+
+      return validType && validTeam;
+    });
 
     const ageDays = i =>
       (now - new Date(i.opened_at || i.sys_created_on)) / 86400000;
 
     const isClosed = i =>
-      i.state?.display_value?.toLowerCase() === 'closed';
+      i.state?.display_value?.toLowerCase() === "closed";
 
     const open = data.filter(i => !isClosed(i));
     const closed = data.filter(isClosed);
 
-    // Leadership cards
-    document.getElementById('incoming').innerText = data.length;
-    document.getElementById('closed').innerText = closed.length;
-    document.getElementById('backlog').innerText = open.length;
+    /* =========================
+       SUMMARY CARDS
+    ========================= */
+    document.getElementById("incoming").innerText = data.length;
+    document.getElementById("closed").innerText = closed.length;
+    document.getElementById("backlog").innerText = open.length;
 
     const slaOK = closed.filter(i => ageDays(i) <= 5).length;
-    document.getElementById('sla').innerText =
-      ((slaOK / (closed.length || 1)) * 100).toFixed(1) + '%';
+    document.getElementById("sla").innerText =
+      ((slaOK / (closed.length || 1)) * 100).toFixed(1) + "%";
 
-    document.getElementById('ftr').innerText =
-      ((closed.length / (data.length || 1)) * 100).toFixed(1) + '%';
+    document.getElementById("ftr").innerText =
+      ((closed.length / (data.length || 1)) * 100).toFixed(1) + "%";
 
-    // Aging buckets
-    document.getElementById('age0_5').innerText =
+    /* =========================
+       AGING
+    ========================= */
+    document.getElementById("age0_5").innerText =
       open.filter(i => ageDays(i) <= 5).length;
-    document.getElementById('age6_10').innerText =
+
+    document.getElementById("age6_10").innerText =
       open.filter(i => ageDays(i) > 5 && ageDays(i) <= 10).length;
-    document.getElementById('age10p').innerText =
+
+    document.getElementById("age10p").innerText =
       open.filter(i => ageDays(i) > 10).length;
 
-    // Team table
-    const team = ['Christina','Saranmai','Balaji','Rachana','Mano','Sreeja'];
-    const tbody = document.getElementById('teamTable');
+    /* =========================
+       TEAM TABLE
+    ========================= */
+    const tbody = document.getElementById("teamTable");
 
-    team.forEach(name => {
+    TEAM.forEach(name => {
+
       const mine = data.filter(i =>
-        i.assigned_to?.display_value?.includes(name)
+        i.assigned_to?.display_value?.toLowerCase().includes(name.toLowerCase())
       );
+
       const o = mine.filter(i => !isClosed(i));
-      const c = mine.filter(isClosed);
-      const avg =
-        o.reduce((a,i)=>a+ageDays(i),0)/(o.length||1);
+      const c = mine.filter(i => isClosed(i));
+
+      const avgAge =
+        o.reduce((sum, i) => sum + ageDays(i), 0) / (o.length || 1);
+
+      const slaPct =
+        (c.filter(i => ageDays(i) <= 5).length / (c.length || 1)) * 100;
+
+      const ftrPct =
+        (c.length / (mine.length || 1)) * 100;
 
       tbody.innerHTML += `
         <tr>
           <td>${name}</td>
           <td>${o.length}</td>
           <td>${c.length}</td>
-          <td>${avg.toFixed(1)}</td>
-          <td>${((c.filter(i=>ageDays(i)<=5).length/(c.length||1))*100).toFixed(0)}%</td>
-          <td>${((c.length/(mine.length||1))*100).toFixed(0)}%</td>
-        </tr>`;
+          <td>${avgAge.toFixed(1)}</td>
+          <td>${slaPct.toFixed(1)}%</td>
+          <td>${ftrPct.toFixed(1)}%</td>
+        </tr>
+      `;
     });
 
-    // Open tickets table
-    const ot = document.getElementById('openTickets');
+    /* =========================
+       OPEN TICKETS TABLE
+    ========================= */
+    const ot = document.getElementById("openTickets");
+
     open.forEach(i => {
       ot.innerHTML += `
         <tr>
           <td>${i.number}</td>
-          <td>${i.assigned_to?.display_value || 'Unassigned'}</td>
-          <td>${i.state.display_value}</td>
+          <td>${i.assigned_to?.display_value || "Unassigned"}</td>
+          <td>${i.state?.display_value || "-"}</td>
           <td>${ageDays(i).toFixed(1)}</td>
-        </tr>`;
+        </tr>
+      `;
     });
+
   });
 </script>
 
 </body>
 </html>
+``
