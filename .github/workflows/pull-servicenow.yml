@@ -33,4 +33,3 @@ jobs:
           git add data/incidents.json
           git commit -m "Auto-refresh ServiceNow incidents" || echo "No changes"
           git push
-``
