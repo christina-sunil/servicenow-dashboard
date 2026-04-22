@@ -1,31 +1,29 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ServiceNow Operations Dashboard</title>
-
+  <title>EAST ServiceNow Dashboard</title>
   <style>
-    body { font-family: Arial, margin: 24px; }
+    body { font-family: Arial, sans-serif; margin: 24px; }
     h1 { color: #2f5bea; }
 
     .cards {
       display: flex;
       gap: 16px;
       margin-bottom: 24px;
-      flex-wrap: wrap;
     }
 
     .card {
       border: 1px solid #ccc;
-      padding: 14px;
       border-radius: 8px;
+      padding: 12px;
       min-width: 150px;
-      background: #f9f9f9;
+      background: #fafafa;
     }
 
     table {
-      border-collapse: collapse;
       width: 100%;
-      margin-bottom: 24px;
+      border-collapse: collapse;
+      margin-bottom: 32px;
     }
 
     th, td {
@@ -34,22 +32,24 @@
       text-align: left;
     }
 
-    th { background: #f0f0f0; }
+    th {
+      background: #f0f0f0;
+    }
   </style>
 </head>
 
 <body>
 
-<h1>ServiceNow Operations Dashboard</h1>
+<h1>EAST ServiceNow Operations Dashboard</h1>
 
-<!-- Leadership summary -->
+<!-- SUMMARY -->
 <div class="cards">
   <div class="card"><b>Incoming</b><br><span id="incoming">0</span></div>
   <div class="card"><b>Closed</b><br><span id="closed">0</span></div>
   <div class="card"><b>Backlog</b><br><span id="backlog">0</span></div>
 </div>
 
-<!-- Team-wise view -->
+<!-- TEAM BACKLOG -->
 <h2>Team Backlog</h2>
 <table>
   <thead>
@@ -57,31 +57,39 @@
       <th>Team Member</th>
       <th>Open</th>
       <th>Closed</th>
-      <th>Avg Age (Days)</th>
     </tr>
   </thead>
   <tbody id="teamTable"></tbody>
 </table>
 
-<!-- Open tickets -->
+<!-- OPEN TICKETS -->
 <h2>Open Tickets</h2>
 <table>
   <thead>
     <tr>
       <th>Ticket</th>
+      <th>Assignment Group</th>
       <th>Assignee</th>
       <th>Status</th>
-      <th>Age (Days)</th>
     </tr>
   </thead>
   <tbody id="openTickets"></tbody>
 </table>
 
 <script>
-// ✅ Ticket types we care about
-const ALLOWED_PREFIXES = ["INC", "RITM"];
+/* ========= CONFIG ========= */
 
-// ✅ Exact ServiceNow display names
+// INC only for now (RITM comes later)
+const TICKET_PREFIX = "INC";
+
+// EAST assignment groups
+const EAST_GROUPS = [
+  "IT Supp: EAST - Delivery",
+  "IT Supp: EAST - Leads",
+  "IT Supp: System Access Requests"
+];
+
+// EAST team (full display names)
 const TEAM = [
   "Chris Braga",
   "Christina Sunil",
@@ -93,81 +101,70 @@ const TEAM = [
   "Sreeja Janumpally"
 ];
 
+/* ========= LOAD DATA ========= */
+
 fetch("data/incidents.json")
-  .then(r => r.json())
-  .then(d => {
-    const now = new Date();
-    const all = d.result || [];
+  .then(res => res.json())
+  .then(data => {
+    const records = data.result || [];
 
-    // ✅ Filter to: INC / RITM + your team only
-    const data = all.filter(i => {
-      const number = i.number || "";
-      const assignee = i.assigned_to?.display_value || "";
-
-      const validType = ALLOWED_PREFIXES.some(p => number.startsWith(p));
-      const validPerson = TEAM.some(name =>
-        assignee.toLowerCase() === name.toLowerCase()
-      );
-
-      return validType && validPerson;
+    // Filter to EAST INC tickets
+    const eastTickets = records.filter(r => {
+      const number = r.number || "";
+      const group = r.assignment_group?.display_value || "";
+      return number.startsWith(TICKET_PREFIX) &&
+             EAST_GROUPS.includes(group);
     });
 
-    const ageDays = i =>
-      (now - new Date(i.opened_at || i.sys_created_on)) / 86400000;
+    const isClosed = r =>
+      (r.state?.display_value || "").toLowerCase() === "closed";
 
-    const isClosed = i =>
-      i.state?.display_value?.toLowerCase() === "closed";
+    const open = eastTickets.filter(r => !isClosed(r));
+    const closed = eastTickets.filter(r => isClosed(r));
 
-    const open = data.filter(i => !isClosed(i));
-    const closed = data.filter(isClosed);
-
-    // Summary cards
-    document.getElementById("incoming").innerText = data.length;
+    // SUMMARY
+    document.getElementById("incoming").innerText = eastTickets.length;
     document.getElementById("closed").innerText = closed.length;
     document.getElementById("backlog").innerText = open.length;
 
-    // Team table
-    const tbody = document.getElementById("teamTable");
+    // TEAM BACKLOG TABLE
+    const teamTable = document.getElementById("teamTable");
 
     TEAM.forEach(name => {
-      const mine = data.filter(i =>
-        i.assigned_to?.display_value?.toLowerCase() === name.toLowerCase()
+      const mineOpen = open.filter(r =>
+        r.assigned_to?.display_value === name
+      );
+      const mineClosed = closed.filter(r =>
+        r.assigned_to?.display_value === name
       );
 
-      const openCount = mine.filter(i => !isClosed(i)).length;
-      const closedCount = mine.filter(isClosed).length;
-
-      const avgAge =
-        mine
-          .filter(i => !isClosed(i))
-          .reduce((a, i) => a + ageDays(i), 0) / (openCount || 1);
-
-      tbody.innerHTML += `
+      teamTable.innerHTML += `
         <tr>
           <td>${name}</td>
-          <td>${openCount}</td>
-          <td>${closedCount}</td>
-          <td>${avgAge.toFixed(1)}</td>
+          <td>${mineOpen.length}</td>
+          <td>${mineClosed.length}</td>
         </tr>
       `;
     });
 
-    // Open tickets table
-    const ot = document.getElementById("openTickets");
+    // OPEN TICKETS TABLE
+    const openTable = document.getElementById("openTickets");
 
-    open.forEach(i => {
-      ot.innerHTML += `
+    open.forEach(r => {
+      openTable.innerHTML += `
         <tr>
-          <td>${i.number}</td>
-          <td>${i.assigned_to.display_value}</td>
-          <td>${i.state.display_value}</td>
-          <td>${ageDays(i).toFixed(1)}</td>
+          <td>${r.number}</td>
+          <td>${r.assignment_group?.display_value || "-"}</td>
+          <td>${r.assigned_to?.display_value || "Unassigned"}</td>
+          <td>${r.state?.display_value || "-"}</td>
         </tr>
       `;
     });
+  })
+  .catch(err => {
+    console.error("Failed to load data:", err);
   });
 </script>
 
 </body>
 </html>
-``
