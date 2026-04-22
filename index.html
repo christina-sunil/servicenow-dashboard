@@ -1,111 +1,59 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>EAST ServiceNow Dashboard</title>
+  <title>EAST Dashboard – Debug</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 24px; }
-    h1 { color: #2f5bea; }
-    .cards { display: flex; gap: 16px; margin-bottom: 24px; }
-    .card { border: 1px solid #ccc; border-radius: 8px; padding: 12px; min-width: 150px; background: #fafafa; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 28px; }
-    th, td { border: 1px solid #ddd; padding: 8px; }
-    th { background: #f0f0f0; }
+    h1 { color: #c0392b; }
+    .box { border: 1px solid #ccc; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+    code { background: #f4f4f4; padding: 4px; display: block; margin-top: 6px; }
   </style>
 </head>
 
 <body>
 
-<h1>ServiceNow Operations Dashboard</h1>
+<h1>ServiceNow Dashboard – DATA DEBUG</h1>
 
-<div class="cards">
-  <div class="card"><b>Incoming</b><br><span id="incoming">0</span></div>
-  <div class="card"><b>Closed</b><br><span id="closed">0</span></div>
-  <div class="card"><b>Backlog</b><br><span id="backlog">0</span></div>
+<div class="box">
+  <b>Data load status:</b>
+  <div id="status">Loading…</div>
 </div>
 
-<h2>Team Backlog</h2>
-<table>
-  <thead>
-    <tr><th>Name</th><th>Open</th><th>Closed</th></tr>
-  </thead>
-  <tbody id="teamTable"></tbody>
-</table>
+<div class="box">
+  <b>Total records loaded:</b>
+  <div id="count">0</div>
+</div>
 
-<h2>Open Tickets</h2>
-<table>
-  <thead>
-    <tr><th>Ticket</th><th>Group</th><th>Assignee</th><th>Status</th></tr>
-  </thead>
-  <tbody id="openTickets"></tbody>
-</table>
+<div class="box">
+  <b>First 5 ticket numbers:</b>
+  <div id="samples"></div>
+</div>
 
 <script>
-// ===== CONFIG =====
-const EAST_GROUPS = [
-  "IT Supp: EAST - Delivery",
-  "IT Supp: EAST - Leads",
-  "IT Supp: System Access Requests"
-];
-
-const TEAM = [
-  "Chris Braga",
-  "Christina Sunil",
-  "Balaji Manikanta Sai Sadhu",
-  "Digvijay Pawar",
-  "Manognasri Chitrala",
-  "Raleigh Turner",
-  "Rachana Adiga",
-  "Sreeja Janumpally"
-];
-
-// ===== LOAD DATA =====
 fetch("data/incidents.json")
-  .then(r => r.json())
+  .then(r => {
+    document.getElementById("status").innerText = "✅ Fetch succeeded";
+    return r.json();
+  })
   .then(d => {
-    const all = d.result || [];
+    const records = d.result || [];
+    document.getElementById("count").innerText = records.length;
 
-    // ✅ SAFE group extraction (handles ALL ServiceNow shapes)
-    const getGroup = r =>
-      r.assignment_group?.display_value ||
-      r.assignment_group ||
-      "";
+    if (records.length === 0) {
+      document.getElementById("samples").innerText = "⚠️ result[] is empty";
+      return;
+    }
 
-    const eastTickets = all.filter(r => {
-      const number = r.number || "";
-      const group = getGroup(r);
-      return number.startsWith("INC") && EAST_GROUPS.includes(group);
+    records.slice(0,5).forEach(r => {
+      const line = document.createElement("code");
+      line.innerText =
+        `${r.number} | ${r.assignment_group?.display_value || r.assignment_group || "NO GROUP"}`;
+      document.getElementById("samples").appendChild(line);
     });
-
-    const isClosed = r =>
-      (r.state?.display_value || "").toLowerCase() === "closed";
-
-    const open = eastTickets.filter(r => !isClosed(r));
-    const closed = eastTickets.filter(r => isClosed(r));
-
-    // ===== SUMMARY =====
-    incoming.innerText = eastTickets.length;
-    closedEl.innerText = closed.length;
-    backlog.innerText = open.length;
-
-    closedEl = document.getElementById("closed");
-
-    // ===== TEAM TABLE =====
-    TEAM.forEach(name => {
-      const openCount = open.filter(r => r.assigned_to?.display_value === name).length;
-      const closedCount = closed.filter(r => r.assigned_to?.display_value === name).length;
-      teamTable.innerHTML += `<tr><td>${name}</td><td>${openCount}</td><td>${closedCount}</td></tr>`;
-    });
-
-    // ===== OPEN TICKETS =====
-    open.forEach(r => {
-      openTickets.innerHTML += `
-        <tr>
-          <td>${r.number}</td>
-          <td>${getGroup(r)}</td>
-          <td>${r.assigned_to?.display_value || "Unassigned"}</td>
-          <td>${r.state?.display_value || "-"}</td>
-        </tr>`;
-    });
+  })
+  .catch(err => {
+    document.getElementById("status").innerText = "❌ Fetch failed";
+    document.getElementById("samples").innerText = err.toString();
   });
 </script>
 
