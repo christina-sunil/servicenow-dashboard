@@ -1,0 +1,36 @@
+name: Pull ServiceNow Dataon:  workflow_dispatch:  schedule:    - cron: '0 2 * * *'   # daily auto refresh (can change later)jobs:  fetch-data:    runs-on: ubuntu-latest    steps:      - name: Checkout repo        uses: actions/checkout@v4      - name: Create data folder        run: mkdir -p data      - name: Fetch incidents from ServiceNow        env:          SN_INSTANCE: ${{ secrets.SN_INSTANCE }}          SN_USERNAME: ${{ secrets.SN_USERNAME }}          SN_PASSWORD: ${{ secrets.SN_PASSWORD }}        run: |          curl -sS -u "$SN_USERNAME:$SN_PASSWORD" \          "$SN_INSTANCE/api/now/table/incident?sysparm_limit=1000&sysparm_display_value=true" \          -o dataname: Pull ServiceNow Data
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'   # daily auto refresh (can change later)
+
+jobs:
+  fetch-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Create data folder
+        run: mkdir -p data
+
+      - name: Fetch incidents from ServiceNow
+        env:
+          SN_INSTANCE: ${{ secrets.SN_INSTANCE }}
+          SN_USERNAME: ${{ secrets.SN_USERNAME }}
+          SN_PASSWORD: ${{ secrets.SN_PASSWORD }}
+        run: |
+          curl -sS -u "$SN_USERNAME:$SN_PASSWORD" \
+          "$SN_INSTANCE/api/now/table/incident?sysparm_limit=1000&sysparm_display_value=true" \
+          -o data/incidents.json
+
+      - name: Commit refreshed data
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add data/incidents.json
+          git commit -m "Auto-refresh ServiceNow incidents" || echo "No changes"
+          git push
+``
