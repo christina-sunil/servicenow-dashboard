@@ -23,8 +23,10 @@ jobs:
           SN_PASSWORD: ${{ secrets.SN_PASSWORD }}
         run: |
           curl -sS -u "$SN_USERNAME:$SN_PASSWORD" \
-          $SN_INSTANCE/api/now/table/incident?sysparm_limit=500&sysparm_query=assignment_groupLIKEEAST&sysparm_display_value=true"
-
+          "${SN_INSTANCE}/api/now/table/incident?
+          sysparm_limit=500&sysparm_query=assignment_groupLIKEEAST&sysparm_display_value=true
+          " \
+          -o data/incidents.json
       - name: Commit refreshed data
         run: |
           git config user.name "github-actions"
