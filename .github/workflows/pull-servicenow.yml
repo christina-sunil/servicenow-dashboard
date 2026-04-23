@@ -21,17 +21,23 @@ jobs:
           SN_INSTANCE: ${{ secrets.SN_INSTANCE }}
           SN_USERNAME: ${{ secrets.SN_USERNAME }}
           SN_PASSWORD: ${{ secrets.SN_PASSWORD }}
-        run: |
+        run: mkdir -p data
           curl -sS -u "$SN_USERNAME:$SN_PASSWORD" \
           --get "${SN_INSTANCE}/api/now/table/incident" \
           --data-urlencode "sysparm_limit=500" \
           --data-urlencode "sysparm_query=assignment_groupLIKEEAST" \
           --data-urlencode "sysparm_display_value=true" \
           -o data/incidents.json
+          curl -sS -u "$SN_USERNAME:$SN_PASSWORD" \  
+          --get "${SN_INSTANCE}/api/now/table/sc_req_item" \  
+          --data-urlencode "sysparm_limit=500" \  
+          --data-urlencode "sysparm_query=assignment_groupLIKEEAST" \  
+          --data-urlencode "sysparm_display_value=true" \  
+          -o data/ritms.json
       - name: Commit refreshed data
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add data/incidents.json
-          git commit -m "Auto-refresh ServiceNow incidents" || echo "No changes"
+          git add data/incidents.json data/ritms.json
+          git commit -m "Auto-refresh ServiceNow incidents and RITMs" || echo "No changes"
           git push
