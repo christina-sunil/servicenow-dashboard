@@ -1,62 +1,114 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>EAST Dashboard – Debug</title>
+  <title>EAST Team – ServiceNow Dashboard</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 24px; }
-    h1 { color: #c0392b; }
-    .box { border: 1px solid #ccc; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
-    code { background: #f4f4f4; padding: 4px; display: block; margin-top: 6px; }
+    h1 { color: #2f5bea; }
+    .cards { display: flex; gap: 16px; margin-bottom: 24px; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 14px; min-width: 160px; background: #fafafa; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
+    th, td { border: 1px solid #ddd; padding: 8px; }
+    th { background: #f0f0f0; }
   </style>
 </head>
 
 <body>
 
-<h1>ServiceNow Dashboard – DATA DEBUG</h1>
+<h1>EAST Team – ServiceNow Dashboard</h1>
 
-<div class="box">
-  <b>Data load status:</b>
-  <div id="status">Loading…</div>
+<div class="cards">
+  <div class="card"><b>Total EAST Tickets</b><br><span id="total">0</span></div>
+  <div class="card"><b>Open</b><br><span id="open">0</span></div>
+  <div class="card"><b>Closed</b><br><span id="closed">0</span></div>
 </div>
 
-<div class="box">
-  <b>Total records loaded:</b>
-  <div id="count">0</div>
-</div>
+<h2>Team Backlog</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Team Member</th>
+      <th>Open</th>
+      <th>Closed</th>
+    </tr>
+  </thead>
+  <tbody id="teamTable"></tbody>
+</table>
 
-<div class="box">
-  <b>First 5 ticket numbers:</b>
-  <div id="samples"></div>
-</div>
+<h2>Open Tickets (EAST)</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Ticket</th>
+      <th>Assignment Group</th>
+      <th>Assignee</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody id="openTickets"></tbody>
+</table>
 
 <script>
+const TEAM = [
+  "Chris Braga",
+  "Christina Sunil",
+  "Balaji Manikanta Sai Sadhu",
+  "Digvijay Pawar",
+  "Manognasri Chitrala",
+  "Raleigh Turner",
+  "Rachana Adiga",
+  "Sreeja Janumpally"
+];
+
 fetch("data/incidents.json")
-  .then(r => {
-    document.getElementById("status").innerText = "✅ Fetch succeeded";
-    return r.json();
-  })
+  .then(r => r.json())
   .then(d => {
     const records = d.result || [];
-    document.getElementById("count").innerText = records.length;
 
-    if (records.length === 0) {
-      document.getElementById("samples").innerText = "⚠️ result[] is empty";
-      return;
-    }
+    const isClosed = r =>
+      (r.state?.display_value || "").toLowerCase() === "closed";
 
-    records.slice(0,5).forEach(r => {
-      const line = document.createElement("code");
-      line.innerText =
-        `${r.number} | ${r.assignment_group?.display_value || r.assignment_group || "NO GROUP"}`;
-      document.getElementById("samples").appendChild(line);
+    const openTickets = records.filter(r => !isClosed(r));
+    const closedTickets = records.filter(isClosed);
+
+    document.getElementById("total").innerText = records.length;
+    document.getElementById("open").innerText = openTickets.length;
+    document.getElementById("closed").innerText = closedTickets.length;
+
+    const teamTable = document.getElementById("teamTable");
+
+    TEAM.forEach(name => {
+      const openCount = openTickets.filter(r =>
+        r.assigned_to?.display_value === name
+      ).length;
+
+      const closedCount = closedTickets.filter(r =>
+        r.assigned_to?.display_value === name
+      ).length;
+
+      teamTable.innerHTML += `
+        <tr>
+          <td>${name}</td>
+          <td>${openCount}</td>
+          <td>${closedCount}</td>
+        </tr>
+      `;
     });
-  })
-  .catch(err => {
-    document.getElementById("status").innerText = "❌ Fetch failed";
-    document.getElementById("samples").innerText = err.toString();
+
+    const openTbody = document.getElementById("openTickets");
+
+    openTickets.forEach(r => {
+      openTbody.innerHTML += `
+        <tr>
+          <td>${r.number}</td>
+          <td>${r.assignment_group?.display_value || "-"}</td>
+          <td>${r.assigned_to?.display_value || "Unassigned"}</td>
+          <td>${r.state?.display_value || "-"}</td>
+        </tr>
+      `;
+    });
   });
 </script>
 
 </body>
 </html>
-``
