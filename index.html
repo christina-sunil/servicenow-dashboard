@@ -1,14 +1,13 @@
-<!-- refresh -->
 <!DOCTYPE html>
 <html>
 <head>
-  <title>EAST Team – ServiceNow Dashboard</title>
+  <title>EAST Team – ServiceNow Dashboard (INC + RITM)</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 24px; }
     h1 { color: #2f5bea; }
-    .cards { display: flex; gap: 16px; margin-bottom: 24px; }
-    .card { border: 1px solid #ccc; border-radius: 8px; padding: 14px; min-width: 160px; background: #fafafa; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
+    .cards { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 14px; min-width: 170px; background: #fafafa; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 28px; }
     th, td { border: 1px solid #ddd; padding: 8px; }
     th { background: #f0f0f0; }
   </style>
@@ -16,10 +15,10 @@
 
 <body>
 
-<h1>EAST Team – ServiceNow Dashboard</h1>
+<h1>EAST Team – ServiceNow Dashboard (INC + RITM)</h1>
 
 <div class="cards">
-  <div class="card"><b>Total EAST Tickets</b><br><span id="total">0</span></div>
+  <div class="card"><b>Total Tickets</b><br><span id="total">0</span></div>
   <div class="card"><b>Open</b><br><span id="open">0</span></div>
   <div class="card"><b>Closed</b><br><span id="closed">0</span></div>
 </div>
@@ -36,11 +35,12 @@
   <tbody id="teamTable"></tbody>
 </table>
 
-<h2>Open Tickets (EAST)</h2>
+<h2>Open Tickets (INC + RITM)</h2>
 <table>
   <thead>
     <tr>
       <th>Ticket</th>
+      <th>Type</th>
       <th>Assignment Group</th>
       <th>Assignee</th>
       <th>Status</th>
@@ -61,54 +61,49 @@ const TEAM = [
   "Sreeja Janumpally"
 ];
 
-fetch("data/incidents.json")
-  .then(r => r.json())
-  .then(d => {
-    const records = d.result || [];
+const display = f => (f && typeof f === "object") ? (f.display_value ?? f.value ?? "") : (f ?? "");
 
-    const isClosed = r =>
-      (r.state?.display_value || "").toLowerCase() === "closed";
+const getNumber = r => r.number ?? "";
+const getType = r => getNumber(r).startsWith("RITM") ? "RITM" : "INC";
+const getGroup = r => display(r.assignment_group);
+const getAssignee = r => display(r.assigned_to);
+const getState = r => display(r.state) || display(r.request_state) || "";
 
-    const openTickets = records.filter(r => !isClosed(r));
-    const closedTickets = records.filter(isClosed);
+const isClosed = r => {
+  const s = getState(r).toLowerCase();
+  return s.includes("closed") || s.includes("complete") || s.includes("resolved");
+};
 
-    document.getElementById("total").innerText = records.length;
-    document.getElementById("open").innerText = openTickets.length;
-    document.getElementById("closed").innerText = closedTickets.length;
+Promise.all([
+  fetch("data/incidents.json").then(r => r.json()),
+  fetch("data/ritms.json").then(r => r.json())
+])
+.then(([inc, ritm]) => {
+  const all = [...(inc.result||[]), ...(ritm.result||[])];
+  const open = all.filter(r => !isClosed(r));
+  const closed = all.filter(isClosed);
 
-    const teamTable = document.getElementById("teamTable");
+  total.innerText = all.length;
+  document.getElementById("open").innerText = open.length;
+  document.getElementById("closed").innerText = closed.length;
 
-    TEAM.forEach(name => {
-      const openCount = openTickets.filter(r =>
-        r.assigned_to?.display_value === name
-      ).length;
-
-      const closedCount = closedTickets.filter(r =>
-        r.assigned_to?.display_value === name
-      ).length;
-
-      teamTable.innerHTML += `
-        <tr>
-          <td>${name}</td>
-          <td>${openCount}</td>
-          <td>${closedCount}</td>
-        </tr>
-      `;
-    });
-
-    const openTbody = document.getElementById("openTickets");
-
-    openTickets.forEach(r => {
-      openTbody.innerHTML += `
-        <tr>
-          <td>${r.number}</td>
-          <td>${r.assignment_group?.display_value || "-"}</td>
-          <td>${r.assigned_to?.display_value || "Unassigned"}</td>
-          <td>${r.state?.display_value || "-"}</td>
-        </tr>
-      `;
-    });
+  TEAM.forEach(name => {
+    const o = open.filter(r => getAssignee(r) === name).length;
+    const c = closed.filter(r => getAssignee(r) === name).length;
+    teamTable.innerHTML += `<tr><td>${name}</td><td>${o}</td><td>${c}</td></tr>`;
   });
+
+  open.forEach(r => {
+    openTickets.innerHTML += `
+      <tr>
+        <td>${getNumber(r)}</td>
+        <td>${getType(r)}</td>
+        <td>${getGroup(r) || "-"}</td>
+        <td>${getAssignee(r) || "Unassigned"}</td>
+        <td>${getState(r)}</td>
+      </tr>`;
+  });
+});
 </script>
 
 </body>
