@@ -2,8 +2,6 @@ name: Pull ServiceNow INC and RITM data
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 2 * * *"   # daily 2:00 UTC
 
 permissions:
   contents: write
@@ -30,7 +28,6 @@ jobs:
             --data-urlencode "sysparm_limit=500" \
             --data-urlencode "sysparm_query=assignment_groupLIKEEAST" \
             --data-urlencode "sysparm_display_value=true" \
-            --data-urlencode "sysparm_exclude_reference_link=true" \
             -o data/incidents.json
 
           curl -sS -u "$SN_USERNAME:$SN_PASSWORD" \
@@ -38,7 +35,6 @@ jobs:
             --data-urlencode "sysparm_limit=500" \
             --data-urlencode "sysparm_query=assignment_groupLIKEEAST" \
             --data-urlencode "sysparm_display_value=true" \
-            --data-urlencode "sysparm_exclude_reference_link=true" \
             -o data/ritms.json
 
       - name: Commit refreshed data
@@ -48,4 +44,3 @@ jobs:
           git add data/incidents.json data/ritms.json
           git commit -m "Auto-refresh ServiceNow incidents and RITMs" || echo "No changes"
           git push
-``
